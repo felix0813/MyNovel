@@ -116,7 +116,7 @@ func (e *ossExporter) upload(ctx context.Context, novels []Novel) error {
 		return err
 	}
 	reader := strings.NewReader(string(b))
-	return e.bucket.PutObject(e.objectName, reader, oss.ContentType("application/json"), oss.Context(ctx))
+	return e.bucket.PutObject(e.objectName, reader, oss.ContentType("application/json"))
 }
 
 func (a *app) handleHealth(w http.ResponseWriter, r *http.Request) {
