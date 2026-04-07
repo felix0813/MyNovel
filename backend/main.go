@@ -53,7 +53,7 @@ type ossExporter struct {
 
 type syncPayload struct {
 	GeneratedAt time.Time `json:"generated_at"`
-	Novels      []Novel   `json:"novels"`
+	Novel       Novel     `json:"novel"`
 }
 
 func main() {
@@ -88,7 +88,7 @@ func newOSSExporter() (*ossExporter, error) {
 	ak := os.Getenv("OSS_ACCESS_KEY_ID")
 	sk := os.Getenv("OSS_ACCESS_KEY_SECRET")
 	bucketName := env("OSS_JSON_BUCKET", "novel-json")
-	objectName := env("OSS_JSON_OBJECT", "novels/latest.json")
+	objectName := env("OSS_JSON_OBJECT", "novels/%d.json")
 
 	if endpoint == "" || ak == "" || sk == "" {
 		log.Printf("OSS env not fully configured, skip json upload")
@@ -110,13 +110,19 @@ func (e *ossExporter) upload(ctx context.Context, novels []Novel) error {
 	if !e.enabled {
 		return nil
 	}
-	payload := syncPayload{GeneratedAt: time.Now().UTC(), Novels: novels}
-	b, err := json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		return err
+	for _, novel := range novels {
+		payload := syncPayload{GeneratedAt: time.Now().UTC(), Novel: novel}
+		b, err := json.MarshalIndent(payload, "", "  ")
+		if err != nil {
+			return err
+		}
+		reader := strings.NewReader(string(b))
+		objectName := fmt.Sprintf(e.objectName, novel.ID)
+		if err := e.bucket.PutObject(objectName, reader, oss.ContentType("application/json")); err != nil {
+			return err
+		}
 	}
-	reader := strings.NewReader(string(b))
-	return e.bucket.PutObject(e.objectName, reader, oss.ContentType("application/json"))
+	return nil
 }
 
 func (a *app) handleHealth(w http.ResponseWriter, r *http.Request) {
