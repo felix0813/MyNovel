@@ -77,3 +77,38 @@ th, td {
   display: flex;
   gap: 0.5rem;
 }
+
+.notfound-body {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: radial-gradient(circle at top, #eef2ff, #f8f9ff 55%, #f6f8fc);
+}
+
+.notfound-card {
+  width: min(460px, 100%);
+  text-align: center;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 2.25rem 1.5rem;
+  box-shadow: 0 14px 36px rgba(79, 70, 229, 0.14);
+}
+
+.notfound-code {
+  margin: 0;
+  font-size: clamp(3rem, 9vw, 4.6rem);
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.08em;
+}
+
+.notfound-card h1 {
+  margin: 0.35rem 0 0;
+  font-size: 1.7rem;
+}
+
+.notfound-desc {
+  margin: 0.85rem auto 1.4rem;
+  color: var(--muted);
+}
