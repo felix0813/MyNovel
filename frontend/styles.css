@@ -73,3 +73,7 @@ th, td {
 .form-grid label { color: var(--muted); font-size: 0.95rem; }
 .full { grid-column: 1 / -1; }
 .actions { display: flex; gap: 0.75rem; }
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
+}
