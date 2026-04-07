@@ -72,9 +72,9 @@ func main() {
 
 	a := &app{db: db, exporter: exporter}
 	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", a.handleHealth)
-	mux.HandleFunc("/api/novels", a.handleNovels)
-	mux.HandleFunc("/api/novels/", a.handleNovelByID)
+	mux.HandleFunc("/myNovel/healthz", a.handleHealth)
+	mux.HandleFunc("/myNovel/api/novels", a.handleNovels)
+	mux.HandleFunc("/myNovel/api/novels/", a.handleNovelByID)
 
 	addr := env("ADDR", ":8080")
 	log.Printf("backend listening on %s", addr)
