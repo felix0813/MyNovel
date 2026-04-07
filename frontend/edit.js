@@ -1,4 +1,4 @@
-const API_BASE = window.API_BASE || "http://localhost:8080/api";
+const API_BASE = "https://wzfly.top/myNovel/api";
 const form = document.getElementById("novelForm");
 const deleteBtn = document.getElementById("deleteBtn");
 const params = new URLSearchParams(window.location.search);
