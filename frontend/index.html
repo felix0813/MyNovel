@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>小说管理</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>📚 小说管理</h1>
+      <a class="btn" href="./edit.html">+ 添加小说</a>
+    </header>
+
+    <main class="container">
+      <section class="card filters">
+        <input id="searchInput" placeholder="搜索名称或平台" />
+        <select id="statusFilter">
+          <option value="">全部状态</option>
+          <option value="unread">未读</option>
+          <option value="reading">在读</option>
+          <option value="finished">已读</option>
+        </select>
+        <button id="refreshBtn" class="btn">刷新</button>
+      </section>
+
+      <section class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>平台</th>
+              <th>状态</th>
+              <th>评分</th>
+              <th>链接</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="novelTbody"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
