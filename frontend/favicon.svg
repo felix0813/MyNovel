@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="小说管理图标">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4338ca"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#eef2ff"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#bg)"/>
+  <path d="M17 18h15c4.4 0 8 3.6 8 8v20H25c-4.4 0-8-3.6-8-8V18z" fill="url(#page)"/>
+  <path d="M47 18H32c-4.4 0-8 3.6-8 8v20h15c4.4 0 8-3.6 8-8V18z" fill="url(#page)" opacity="0.95"/>
+  <path d="M24 28h17M24 34h17" stroke="#c7d2fe" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="43" cy="43" r="7" fill="#22c55e"/>
+  <path d="M40.4 43.2l1.9 1.9 3.4-3.6" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
