@@ -1,10 +1,16 @@
-# Aliyun OSS Trigger Function（Go）
+# Aliyun OSS Trigger Function（Node.js）
 
 该函数用于监听 `novel-json` 桶中的 JSON 对象变更事件：
 
 1. 读取事件中的 JSON（默认由 backend 写入 `novels/latest.json`）。
 2. 将小说数据渲染为静态 HTML。
 3. 上传到 `novels-html` 桶下的 `novels/index.html`。
+
+## Runtime 与入口
+
+- Runtime: Node.js
+- Entry: `index.mjs`
+- Handler: `handler`
 
 ## 环境变量
 
@@ -31,5 +37,3 @@
   ]
 }
 ```
-
-> 说明：示例中的 `httpStart` 是占位方法，实际部署到阿里云函数计算时请替换为官方 Go Runtime 启动入口。
