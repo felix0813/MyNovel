@@ -78,7 +78,7 @@ func main() {
 
 	addr := env("ADDR", ":8080")
 	log.Printf("backend listening on %s", addr)
-	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
+	if err := http.ListenAndServe(addr, withCORS(withLogging(mux))); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -354,6 +354,33 @@ func withCORS(next http.Handler) http.Handler {
 	})
 }
 
+func withLogging(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		next.ServeHTTP(wrapped, r)
+
+		duration := time.Since(start)
+		log.Printf("[%s] %s %s - Status: %d - Duration: %v",
+			r.Method,
+			r.RemoteAddr,
+			r.URL.Path,
+			wrapped.statusCode,
+			duration,
+		)
+	})
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
 func env(key, fallback string) string {
 	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 		return v
