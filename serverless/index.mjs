@@ -105,7 +105,7 @@ export const handler = async (event) => {
   console.log('[handler] parsed OSS trigger', { sourceBucket, sourceObjectKey });
 
   const targetPrefix = (process.env.TARGET_HTML_PREFIX || 'novels').replace(/^\/+|\/+$/g, '');
-  const targetKey = `${targetPrefix}/${sourceObjectKey.replace('.json', '.html')}`;
+  const targetKey = `${targetPrefix}/${sourceObjectKey.replace('.json', '.html').split('/').pop()}`;
   console.log('[handler] target key resolved', { targetKey });
 
   const sourceClient = createClient();
