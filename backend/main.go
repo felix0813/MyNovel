@@ -95,14 +95,18 @@ func newOSSExporter() (*ossExporter, error) {
 		return &ossExporter{enabled: false}, nil
 	}
 
-	client, err := oss.New(endpoint, ak, sk)
+	// 创建带有 2 秒超时的 OSS 客户端
+	client, err := oss.New(endpoint, ak, sk,
+		oss.Timeout(2, 10)) // 重试次数设为 1
 	if err != nil {
 		return nil, err
 	}
+
 	bucket, err := client.Bucket(bucketName)
 	if err != nil {
 		return nil, err
 	}
+
 	return &ossExporter{enabled: true, bucket: bucket, objectName: objectName}, nil
 }
 
