@@ -87,6 +87,11 @@ function createClient() {
 }
 
 export const handler = async (event) => {
+  console.log('[handler] received event', {
+    eventType: typeof event,
+    isBuffer: Buffer.isBuffer(event),
+  });
+
   const parsed = parseEvent(event);
   if (!parsed?.events?.length) {
     throw new Error('event is empty');
@@ -97,17 +102,21 @@ export const handler = async (event) => {
   if (!sourceBucket || !sourceObjectKey) {
     throw new Error('missing OSS event bucket/object');
   }
+  console.log('[handler] parsed OSS trigger', { sourceBucket, sourceObjectKey });
 
   const targetPrefix = (process.env.TARGET_HTML_PREFIX || 'novels').replace(/^\/+|\/+$/g, '');
   const targetKey = `${targetPrefix}/index.html`;
+  console.log('[handler] target key resolved', { targetKey });
 
   const sourceClient = createClient();
   sourceClient.options.bucket = sourceBucket;
+  console.log('[handler] fetching source object');
 
   const sourceResp = await sourceClient.get(sourceObjectKey);
   const payload = typeof sourceResp.content === 'string'
     ? JSON.parse(sourceResp.content)
     : JSON.parse(sourceResp.content.toString('utf8'));
+  console.log('[handler] source payload loaded');
 
   const novels = Array.isArray(payload?.novels) ? payload.novels : [];
   novels.sort((a, b) => (Number(b?.rating) || 0) - (Number(a?.rating) || 0));
@@ -115,13 +124,16 @@ export const handler = async (event) => {
     ...novel,
     id: Number(novel?.id),
   }));
+  console.log('[handler] novels normalized', { count: normalizedNovels.length });
 
   const page = pageTemplate({ novels: normalizedNovels });
 
   const targetClient = createClient();
+  console.log('[handler] uploading generated html');
   await targetClient.put(targetKey, Buffer.from(page, 'utf8'), {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   });
+  console.log('[handler] upload completed', { targetKey });
 
   return `generated ${targetKey}`;
 };
