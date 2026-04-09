@@ -23,9 +23,9 @@ const pageTemplate = ({ novels }) => `<!doctype html>
   </header>
   <main>
     ${novels.length > 0
-      ? novels
-          .map(
-            (novel) => `
+    ? novels
+      .map(
+        (novel) => `
       <div class="card">
         <div class="row"><h3>${escapeHtml(novel.name || '')}</h3><strong>${statusLabel(novel.status)}</strong></div>
         <div class="meta">平台：${escapeHtml(novel.platform || '')} | 评分：${Number.isFinite(novel.rating) ? novel.rating : 0}/10</div>
@@ -37,20 +37,20 @@ const pageTemplate = ({ novels }) => `<!doctype html>
           ${novel.url ? ` | <a href="${escapeHtml(novel.url)}" target="_blank">阅读链接</a>` : ''}
         </div>
       </div>`,
-          )
-          .join('')
-      : '<div class="card">暂无小说数据</div>'}
+      )
+      .join('')
+    : '<div class="card">暂无小说数据</div>'}
   </main>
 </body>
 </html>`;
 
-function statusLabel(status) {
+function statusLabel (status) {
   if (status === 'unread') return '未读';
   if (status === 'reading') return '在读';
   return '已读';
 }
 
-function escapeHtml(raw) {
+function escapeHtml (raw) {
   return String(raw)
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -59,7 +59,7 @@ function escapeHtml(raw) {
     .replaceAll("'", '&#39;');
 }
 
-function parseEvent(event) {
+function parseEvent (event) {
   if (typeof event === 'string') {
     return JSON.parse(event);
   }
@@ -69,7 +69,7 @@ function parseEvent(event) {
   return event;
 }
 
-function createClient() {
+function createClient () {
   const endpoint = process.env.OSS_ENDPOINT;
   const accessKeyId = process.env.OSS_ACCESS_KEY_ID;
   const accessKeySecret = process.env.OSS_ACCESS_KEY_SECRET;
@@ -105,7 +105,7 @@ export const handler = async (event) => {
   console.log('[handler] parsed OSS trigger', { sourceBucket, sourceObjectKey });
 
   const targetPrefix = (process.env.TARGET_HTML_PREFIX || 'novels').replace(/^\/+|\/+$/g, '');
-  const targetKey = `${targetPrefix}/index.html`;
+  const targetKey = `${targetPrefix}/${sourceObjectKey.replace('.json', '.html')}`;
   console.log('[handler] target key resolved', { targetKey });
 
   const sourceClient = createClient();
