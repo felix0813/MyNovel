@@ -30,7 +30,12 @@ const pageTemplate = ({ novels }) => `<!doctype html>
         <div class="row"><h3>${escapeHtml(novel.name || '')}</h3><strong>${statusLabel(novel.status)}</strong></div>
         <div class="meta">平台：${escapeHtml(novel.platform || '')} | 评分：${Number.isFinite(novel.rating) ? novel.rating : 0}/10</div>
         <div class="meta">文件：${escapeHtml(novel.file || '')}</div>
-        ${novel.url ? `<div><a href="${escapeHtml(novel.url)}" target="_blank">阅读链接</a></div>` : ''}
+        <div>
+          ${Number.isFinite(Number(novel.id))
+            ? `<a href="/novels/${Number(novel.id)}.html">详情页（预留）</a>`
+            : '<span class="meta">暂无详情页 ID</span>'}
+          ${novel.url ? ` | <a href="${escapeHtml(novel.url)}" target="_blank">阅读链接</a>` : ''}
+        </div>
       </div>`,
           )
           .join('')
@@ -106,8 +111,12 @@ export const handler = async (event) => {
 
   const novels = Array.isArray(payload?.novels) ? payload.novels : [];
   novels.sort((a, b) => (Number(b?.rating) || 0) - (Number(a?.rating) || 0));
+  const normalizedNovels = novels.map((novel) => ({
+    ...novel,
+    id: Number(novel?.id),
+  }));
 
-  const page = pageTemplate({ novels });
+  const page = pageTemplate({ novels: normalizedNovels });
 
   const targetClient = createClient();
   await targetClient.put(targetKey, Buffer.from(page, 'utf8'), {

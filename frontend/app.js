@@ -14,13 +14,18 @@ async function loadNovels() {
 
   tbody.innerHTML = "";
   data.forEach((n) => {
+    const novelId = Number(n.id);
+    const detailLink = Number.isFinite(novelId) ? `/novels/${novelId}.html` : "";
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${escapeHtml(n.name)}</td>
+      <td>${detailLink ? `<a href="${detailLink}" target="_blank">${escapeHtml(n.name)}</a>` : escapeHtml(n.name)}</td>
       <td>${escapeHtml(n.platform || "-")}</td>
       <td>${statusText(n.status)}</td>
       <td>${n.rating}</td>
-      <td>${n.url ? `<a href="${n.url}" target="_blank">查看</a>` : "-"}</td>
+      <td>
+        ${n.url ? `<a href="${n.url}" target="_blank">阅读</a>` : "-"}
+        ${detailLink ? ` / <a href="${detailLink}" target="_blank">详情页</a>` : ""}
+      </td>
       <td class="row-actions">
         <a class="btn" href="./edit.html?id=${n.id}">编辑</a>
         <button class="btn danger js-delete-btn" data-id="${n.id}" data-name="${escapeHtml(n.name)}" type="button">删除</button>
