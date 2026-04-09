@@ -126,7 +126,44 @@ func (e *ossExporter) upload(ctx context.Context, novels []Novel) error {
 }
 
 func (a *app) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	// 检查数据库连接
+	dbStatus := "ok"
+	if a.db.Ping(r.Context()) != nil {
+		dbStatus = "failed"
+	}
+
+	// 检查 OSS 连接
+	ossStatus := "disabled"
+	if a.exporter.enabled {
+		// 尝试列出 bucket 中的对象来验证连接
+		_, err := a.exporter.bucket.ListObjects(oss.MaxKeys(1))
+		if err != nil {
+			ossStatus = "failed"
+		} else {
+			ossStatus = "ok"
+		}
+	}
+
+	healthInfo := map[string]string{
+		"status":     "ok",
+		"database":   dbStatus,
+		"oss_export": ossStatus,
+	}
+
+	// 如果有任何组件失败，整体状态应为失败
+	if dbStatus == "failed" || ossStatus == "failed" {
+		healthInfo["status"] = "failed"
+		if dbStatus == "failed" {
+			log.Printf("Health check failed: database connection issue")
+		}
+		if ossStatus == "failed" {
+			log.Printf("Health check failed: OSS connection issue")
+		}
+		writeJSON(w, http.StatusServiceUnavailable, healthInfo)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, healthInfo)
 }
 
 func (a *app) handleNovels(w http.ResponseWriter, r *http.Request) {
