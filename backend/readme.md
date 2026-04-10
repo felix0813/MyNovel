@@ -60,7 +60,9 @@ go run .
 | `OSS_ACCESS_KEY_ID` | OSS 同步时必需 | 无 | 阿里云 AccessKey ID。 |
 | `OSS_ACCESS_KEY_SECRET` | OSS 同步时必需 | 无 | 阿里云 AccessKey Secret。 |
 | `OSS_JSON_BUCKET` | 否 | `novel-json` | OSS Bucket 名称。 |
-| `OSS_JSON_OBJECT` | 否 | `novels/latest.json` | OSS 中 JSON 对象路径。 |
+| `OSS_JSON_OBJECT` | 否 | `novels/%d.json` | OSS 中 JSON 对象路径模板（按小说 ID 生成）。 |
+| `OSS_HTML_BUCKET` | 否 | `novels-html` | 存放小说 HTML 文件的 OSS Bucket 名称。 |
+| `OSS_HTML_OBJECT` | 否 | `novels/%d.html` | OSS 中 HTML 对象路径模板（按小说 ID 生成）。 |
 
 > 说明：如果 `OSS_ENDPOINT` / `OSS_ACCESS_KEY_ID` / `OSS_ACCESS_KEY_SECRET` 任一未配置，后端会自动跳过 OSS 上传，不影响 API 正常使用。
 
@@ -130,5 +132,8 @@ go run .
 2. **新增/更新成功但提示 sync failed**
    - 这通常是 OSS 配置错误导致上传失败；如不需要 OSS，可不配置 OSS 三个必需变量。
 
-3. **前端跨域失败**
+3. **删除成功但提示 html cleanup failed**
+   - 表示数据库记录已删除，但 `novels-html`（或 `OSS_HTML_BUCKET`）中的 `novels/{id}.html` 删除失败，请检查 OSS 权限与对象路径模板配置。
+
+4. **前端跨域失败**
    - 设置 `CORS_ALLOW_ORIGIN` 为前端地址（如 `http://localhost:3000`），避免使用生产环境下的 `*`。
