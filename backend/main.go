@@ -59,11 +59,13 @@ type syncPayload struct {
 func main() {
 	ctx := context.Background()
 	dsn := env("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/mynovel?sslmode=disable")
+	log.Printf("initializing backend service")
 	db, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		log.Fatalf("connect db failed: %v", err)
 	}
 	defer db.Close()
+	log.Printf("database pool initialized")
 
 	exporter, err := newOSSExporter()
 	if err != nil {
@@ -106,26 +108,33 @@ func newOSSExporter() (*ossExporter, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("OSS exporter enabled, bucket=%s objectPattern=%s", bucketName, objectName)
 
 	return &ossExporter{enabled: true, bucket: bucket, objectName: objectName}, nil
 }
 
 func (e *ossExporter) upload(ctx context.Context, novels []Novel) error {
 	if !e.enabled {
+		log.Printf("skip OSS upload because exporter is disabled")
 		return nil
 	}
+	log.Printf("start OSS upload, novels_count=%d", len(novels))
 	for _, novel := range novels {
 		payload := syncPayload{GeneratedAt: time.Now().UTC(), Novel: novel}
 		b, err := json.MarshalIndent(payload, "", "  ")
 		if err != nil {
+			log.Printf("marshal novel payload failed, novel_id=%d err=%v", novel.ID, err)
 			return err
 		}
 		reader := strings.NewReader(string(b))
 		objectName := fmt.Sprintf(e.objectName, novel.ID)
 		if err := e.bucket.PutObject(objectName, reader, oss.ContentType("application/json")); err != nil {
+			log.Printf("upload novel json failed, novel_id=%d object=%s err=%v", novel.ID, objectName, err)
 			return err
 		}
+		log.Printf("uploaded novel json, novel_id=%d object=%s", novel.ID, objectName)
 	}
+	log.Printf("OSS upload completed, novels_count=%d", len(novels))
 	return nil
 }
 
@@ -203,6 +212,7 @@ func (a *app) handleNovelByID(w http.ResponseWriter, r *http.Request) {
 func (a *app) listNovels(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	log.Printf("list novels requested, q=%q status=%q", q, status)
 
 	query := `
 		SELECT id, name, platform, url, file_path, description, status::text, rating, created_at, updated_at
@@ -212,6 +222,7 @@ func (a *app) listNovels(w http.ResponseWriter, r *http.Request) {
 		ORDER BY updated_at DESC`
 	rows, err := a.db.Query(r.Context(), query, q, status)
 	if err != nil {
+		log.Printf("list novels query failed, q=%q status=%q err=%v", q, status, err)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -221,35 +232,43 @@ func (a *app) listNovels(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var n Novel
 		if err := rows.Scan(&n.ID, &n.Name, &n.Platform, &n.URL, &n.File, &n.Description, &n.Status, &n.Rating, &n.CreatedAt, &n.UpdatedAt); err != nil {
+			log.Printf("list novels scan failed err=%v", err)
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		novels = append(novels, n)
 	}
+	log.Printf("list novels completed, count=%d", len(novels))
 	writeJSON(w, http.StatusOK, novels)
 }
 
 func (a *app) getNovel(w http.ResponseWriter, r *http.Request, id int64) {
+	log.Printf("get novel requested, id=%d", id)
 	var n Novel
 	err := a.db.QueryRow(r.Context(), `
 		SELECT id, name, platform, url, file_path, description, status::text, rating, created_at, updated_at
 		FROM novels WHERE id=$1`, id).Scan(&n.ID, &n.Name, &n.Platform, &n.URL, &n.File, &n.Description, &n.Status, &n.Rating, &n.CreatedAt, &n.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			log.Printf("get novel not found, id=%d", id)
 			writeError(w, http.StatusNotFound, "novel not found")
 			return
 		}
+		log.Printf("get novel query failed, id=%d err=%v", id, err)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	log.Printf("get novel completed, id=%d", id)
 	writeJSON(w, http.StatusOK, n)
 }
 
 func (a *app) createNovel(w http.ResponseWriter, r *http.Request) {
 	in, ok := decodeAndValidateNovel(w, r)
 	if !ok {
+		log.Printf("create novel validation failed")
 		return
 	}
+	log.Printf("create novel requested, name=%q platform=%q status=%q rating=%d", in.Name, in.Platform, in.Status, in.Rating)
 	var n Novel
 	err := a.db.QueryRow(r.Context(), `
 		INSERT INTO novels(name, platform, url, file_path, description, status, rating)
@@ -258,21 +277,27 @@ func (a *app) createNovel(w http.ResponseWriter, r *http.Request) {
 		in.Name, in.Platform, in.URL, in.File, in.Description, in.Status, in.Rating,
 	).Scan(&n.ID, &n.Name, &n.Platform, &n.URL, &n.File, &n.Description, &n.Status, &n.Rating, &n.CreatedAt, &n.UpdatedAt)
 	if err != nil {
+		log.Printf("create novel db insert failed, name=%q err=%v", in.Name, err)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	log.Printf("create novel succeeded, id=%d", n.ID)
 	if err := a.syncNovels(r.Context()); err != nil {
+		log.Printf("create novel sync failed, id=%d err=%v", n.ID, err)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel created but sync failed: %v", err))
 		return
 	}
+	log.Printf("create novel completed, id=%d", n.ID)
 	writeJSON(w, http.StatusCreated, n)
 }
 
 func (a *app) updateNovel(w http.ResponseWriter, r *http.Request, id int64) {
 	in, ok := decodeAndValidateNovel(w, r)
 	if !ok {
+		log.Printf("update novel validation failed, id=%d", id)
 		return
 	}
+	log.Printf("update novel requested, id=%d status=%q rating=%d", id, in.Status, in.Rating)
 	var n Novel
 	err := a.db.QueryRow(r.Context(), `
 		UPDATE novels
@@ -283,41 +308,54 @@ func (a *app) updateNovel(w http.ResponseWriter, r *http.Request, id int64) {
 	).Scan(&n.ID, &n.Name, &n.Platform, &n.URL, &n.File, &n.Description, &n.Status, &n.Rating, &n.CreatedAt, &n.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			log.Printf("update novel not found, id=%d", id)
 			writeError(w, http.StatusNotFound, "novel not found")
 			return
 		}
+		log.Printf("update novel db update failed, id=%d err=%v", id, err)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	log.Printf("update novel succeeded, id=%d", id)
 	if err := a.syncNovels(r.Context()); err != nil {
+		log.Printf("update novel sync failed, id=%d err=%v", id, err)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel updated but sync failed: %v", err))
 		return
 	}
+	log.Printf("update novel completed, id=%d", id)
 	writeJSON(w, http.StatusOK, n)
 }
 
 func (a *app) deleteNovel(w http.ResponseWriter, r *http.Request, id int64) {
+	log.Printf("delete novel requested, id=%d", id)
 	res, err := a.db.Exec(r.Context(), `DELETE FROM novels WHERE id=$1`, id)
 	if err != nil {
+		log.Printf("delete novel db delete failed, id=%d err=%v", id, err)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if res.RowsAffected() == 0 {
+		log.Printf("delete novel not found, id=%d", id)
 		writeError(w, http.StatusNotFound, "novel not found")
 		return
 	}
+	log.Printf("delete novel succeeded, id=%d", id)
 	if err := a.syncNovels(r.Context()); err != nil {
+		log.Printf("delete novel sync failed, id=%d err=%v", id, err)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel deleted but sync failed: %v", err))
 		return
 	}
+	log.Printf("delete novel completed, id=%d", id)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "deleted"})
 }
 
 func (a *app) syncNovels(ctx context.Context) error {
+	log.Printf("start syncing novels to OSS")
 	rows, err := a.db.Query(ctx, `
 		SELECT id, name, platform, url, file_path, description, status::text, rating, created_at, updated_at
 		FROM novels ORDER BY updated_at DESC`)
 	if err != nil {
+		log.Printf("sync novels query failed err=%v", err)
 		return err
 	}
 	defer rows.Close()
@@ -326,11 +364,17 @@ func (a *app) syncNovels(ctx context.Context) error {
 	for rows.Next() {
 		var n Novel
 		if err := rows.Scan(&n.ID, &n.Name, &n.Platform, &n.URL, &n.File, &n.Description, &n.Status, &n.Rating, &n.CreatedAt, &n.UpdatedAt); err != nil {
+			log.Printf("sync novels scan failed err=%v", err)
 			return err
 		}
 		novels = append(novels, n)
 	}
-	return a.exporter.upload(ctx, novels)
+	if err := a.exporter.upload(ctx, novels); err != nil {
+		log.Printf("sync novels upload failed, count=%d err=%v", len(novels), err)
+		return err
+	}
+	log.Printf("sync novels completed, count=%d", len(novels))
+	return nil
 }
 
 func decodeAndValidateNovel(w http.ResponseWriter, r *http.Request) (NovelInput, bool) {
