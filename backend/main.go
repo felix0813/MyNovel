@@ -46,9 +46,11 @@ type app struct {
 }
 
 type ossExporter struct {
-	enabled    bool
-	bucket     *oss.Bucket
-	objectName string
+	enabled         bool
+	jsonBucket      *oss.Bucket
+	jsonObjectName  string
+	htmlBucket      *oss.Bucket
+	htmlObjectName  string
 }
 
 type syncPayload struct {
@@ -89,8 +91,10 @@ func newOSSExporter() (*ossExporter, error) {
 	endpoint := os.Getenv("OSS_ENDPOINT")
 	ak := os.Getenv("OSS_ACCESS_KEY_ID")
 	sk := os.Getenv("OSS_ACCESS_KEY_SECRET")
-	bucketName := env("OSS_JSON_BUCKET", "novel-json")
-	objectName := env("OSS_JSON_OBJECT", "novels/%d.json")
+	jsonBucketName := env("OSS_JSON_BUCKET", "novel-json")
+	jsonObjectName := env("OSS_JSON_OBJECT", "novels/%d.json")
+	htmlBucketName := env("OSS_HTML_BUCKET", "novels-html")
+	htmlObjectName := env("OSS_HTML_OBJECT", "novels/%d.html")
 
 	if endpoint == "" || ak == "" || sk == "" {
 		log.Printf("OSS env not fully configured, skip json upload")
@@ -104,13 +108,23 @@ func newOSSExporter() (*ossExporter, error) {
 		return nil, err
 	}
 
-	bucket, err := client.Bucket(bucketName)
+	jsonBucket, err := client.Bucket(jsonBucketName)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("OSS exporter enabled, bucket=%s objectPattern=%s", bucketName, objectName)
+	htmlBucket, err := client.Bucket(htmlBucketName)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("OSS exporter enabled, json_bucket=%s json_object_pattern=%s html_bucket=%s html_object_pattern=%s", jsonBucketName, jsonObjectName, htmlBucketName, htmlObjectName)
 
-	return &ossExporter{enabled: true, bucket: bucket, objectName: objectName}, nil
+	return &ossExporter{
+		enabled:        true,
+		jsonBucket:     jsonBucket,
+		jsonObjectName: jsonObjectName,
+		htmlBucket:     htmlBucket,
+		htmlObjectName: htmlObjectName,
+	}, nil
 }
 
 func (e *ossExporter) upload(ctx context.Context, novels []Novel) error {
@@ -127,14 +141,34 @@ func (e *ossExporter) upload(ctx context.Context, novels []Novel) error {
 			return err
 		}
 		reader := strings.NewReader(string(b))
-		objectName := fmt.Sprintf(e.objectName, novel.ID)
-		if err := e.bucket.PutObject(objectName, reader, oss.ContentType("application/json")); err != nil {
+		objectName := fmt.Sprintf(e.jsonObjectName, novel.ID)
+		if err := e.jsonBucket.PutObject(objectName, reader, oss.ContentType("application/json")); err != nil {
 			log.Printf("upload novel json failed, novel_id=%d object=%s err=%v", novel.ID, objectName, err)
 			return err
 		}
 		log.Printf("uploaded novel json, novel_id=%d object=%s", novel.ID, objectName)
 	}
 	log.Printf("OSS upload completed, novels_count=%d", len(novels))
+	return nil
+}
+
+func (e *ossExporter) deleteNovelHTML(novelID int64) error {
+	if !e.enabled {
+		log.Printf("skip OSS html delete because exporter is disabled, novel_id=%d", novelID)
+		return nil
+	}
+	objectName := fmt.Sprintf(e.htmlObjectName, novelID)
+	err := e.htmlBucket.DeleteObject(objectName)
+	if err != nil {
+		// 文件不存在时视为已经删除
+		if strings.Contains(strings.ToLower(err.Error()), "nosuchkey") {
+			log.Printf("OSS html object not found, skip delete, novel_id=%d object=%s", novelID, objectName)
+			return nil
+		}
+		log.Printf("delete novel html failed, novel_id=%d object=%s err=%v", novelID, objectName, err)
+		return err
+	}
+	log.Printf("delete novel html succeeded, novel_id=%d object=%s", novelID, objectName)
 	return nil
 }
 
@@ -149,7 +183,7 @@ func (a *app) handleHealth(w http.ResponseWriter, r *http.Request) {
 	ossStatus := "disabled"
 	if a.exporter.enabled {
 		// 尝试列出 bucket 中的对象来验证连接
-		_, err := a.exporter.bucket.ListObjects(oss.MaxKeys(1))
+		_, err := a.exporter.jsonBucket.ListObjects(oss.MaxKeys(1))
 		if err != nil {
 			ossStatus = "failed"
 		} else {
@@ -340,6 +374,11 @@ func (a *app) deleteNovel(w http.ResponseWriter, r *http.Request, id int64) {
 		return
 	}
 	log.Printf("delete novel succeeded, id=%d", id)
+	if err := a.exporter.deleteNovelHTML(id); err != nil {
+		log.Printf("delete novel html object failed, id=%d err=%v", id, err)
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel deleted but html cleanup failed: %v", err))
+		return
+	}
 	if err := a.syncNovels(r.Context()); err != nil {
 		log.Printf("delete novel sync failed, id=%d err=%v", id, err)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel deleted but sync failed: %v", err))
