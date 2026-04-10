@@ -409,10 +409,10 @@ func decodeAndValidateNovel(w http.ResponseWriter, r *http.Request) (NovelInput,
 
 func parseID(path string) (int64, error) {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) < 3 {
+	if len(parts) == 0 {
 		return 0, errors.New("bad path")
 	}
-	return strconv.ParseInt(parts[2], 10, 64)
+	return strconv.ParseInt(parts[len(parts)-1], 10, 64)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
