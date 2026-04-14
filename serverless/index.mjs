@@ -7,39 +7,54 @@ const pageTemplate = ({ novels }) => `<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>小说展示</title>
   <style>
-    body{font-family:Arial,"Microsoft YaHei";background:#f8fafc;margin:0;color:#1e293b}
-    header{padding:18px 24px;background:#4338ca;color:#fff}
-    main{max-width:1000px;margin:20px auto;padding:0 12px}
-    .card{background:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,.06)}
-    .meta{color:#64748b;font-size:13px}
-    .row{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
-    a{color:#4f46e5;text-decoration:none}
+    :root{color-scheme:light only}
+    *{box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:#f4f6f8;margin:0;color:#1f2937}
+    .wrap{max-width:900px;margin:0 auto;padding:36px 16px 48px}
+    .header{margin-bottom:18px}
+    h1{margin:0;font-size:28px;font-weight:700;letter-spacing:.3px}
+    .sub{margin-top:6px;color:#6b7280;font-size:14px}
+    .list{display:grid;gap:10px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px}
+    .row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .name{font-size:17px;font-weight:600}
+    .badge{font-size:12px;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#4338ca}
+    .meta{margin-top:8px;color:#6b7280;font-size:13px}
+    .actions{margin-top:10px;display:flex;gap:12px;flex-wrap:wrap}
+    a{color:#2563eb;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .empty{padding:24px;text-align:center;color:#6b7280}
   </style>
 </head>
 <body>
-  <header>
-    <h1>📚 小说展示页</h1>
-    <div><a style="color:#c7d2fe" href="/index.html">返回管理首页</a></div>
-  </header>
-  <main>
+  <main class="wrap">
+    <header class="header">
+      <h1>小说展示</h1>
+      <div class="sub">简洁列表 · 按评分排序</div>
+    </header>
+    <section class="list">
     ${novels.length > 0
     ? novels
       .map(
         (novel) => `
       <div class="card">
-        <div class="row"><h3>${escapeHtml(novel.name || '')}</h3><strong>${statusLabel(novel.status)}</strong></div>
+        <div class="row">
+          <div class="name">${escapeHtml(novel.name || '')}</div>
+          <span class="badge">${statusLabel(novel.status)}</span>
+        </div>
         <div class="meta">平台：${escapeHtml(novel.platform || '')} | 评分：${Number.isFinite(novel.rating) ? novel.rating : 0}/10</div>
         <div class="meta">文件：${escapeHtml(novel.file || '')}</div>
-        <div>
+        <div class="actions">
           ${Number.isFinite(Number(novel.id))
-            ? `<a href="/novels/${Number(novel.id)}.html">详情页（预留）</a>`
-            : '<span class="meta">暂无详情页 ID</span>'}
-          ${novel.url ? ` | <a href="${escapeHtml(novel.url)}" target="_blank">阅读链接</a>` : ''}
+            ? `<a href="https://novel.wzfly.top/edit.html?id=${Number(novel.id)}">前往编辑页</a>`
+            : '<span class="meta">暂无可用 ID</span>'}
+          ${novel.url ? `<a href="${escapeHtml(novel.url)}" target="_blank" rel="noopener noreferrer">阅读链接</a>` : ''}
         </div>
       </div>`,
       )
       .join('')
-    : '<div class="card">暂无小说数据</div>'}
+    : '<div class="card empty">暂无小说数据</div>'}
+    </section>
   </main>
 </body>
 </html>`;
