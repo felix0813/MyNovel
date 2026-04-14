@@ -13,7 +13,6 @@ const pageTemplate = ({ novels }) => `<!doctype html>
     .wrap{max-width:900px;margin:0 auto;padding:36px 16px 48px}
     .header{margin-bottom:18px}
     h1{margin:0;font-size:28px;font-weight:700;letter-spacing:.3px}
-    .sub{margin-top:6px;color:#6b7280;font-size:14px}
     .list{display:grid;gap:10px}
     .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px}
     .row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -30,7 +29,6 @@ const pageTemplate = ({ novels }) => `<!doctype html>
   <main class="wrap">
     <header class="header">
       <h1>小说展示</h1>
-      <div class="sub">简洁列表 · 按评分排序</div>
     </header>
     <section class="list">
     ${novels.length > 0
