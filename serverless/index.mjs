@@ -118,7 +118,9 @@ export const handler = async (event) => {
     : JSON.parse(sourceResp.content.toString('utf8'));
   console.log('[handler] source payload loaded');
 
-  const novels = Array.isArray(payload?.novels) ? payload.novels : [];
+  const novels = Array.isArray(payload?.novels)
+    ? payload.novels
+    : (payload?.novel ? [payload.novel] : []);
   novels.sort((a, b) => (Number(b?.rating) || 0) - (Number(a?.rating) || 0));
   const normalizedNovels = novels.map((novel) => ({
     ...novel,
