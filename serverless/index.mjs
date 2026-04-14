@@ -5,6 +5,7 @@ const pageTemplate = ({ novels }) => `<!doctype html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <title>小说展示</title>
   <style>
     :root{color-scheme:light only}
