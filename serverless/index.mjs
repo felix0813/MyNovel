@@ -20,6 +20,7 @@ const pageTemplate = ({ novels }) => `<!doctype html>
     .name{font-size:17px;font-weight:600}
     .badge{font-size:12px;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#4338ca}
     .meta{margin-top:8px;color:#6b7280;font-size:13px}
+    .desc{margin-top:8px;color:#374151;font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
     .actions{margin-top:10px;display:flex;gap:12px;flex-wrap:wrap}
     a{color:#2563eb;text-decoration:none}
     a:hover{text-decoration:underline}
@@ -43,6 +44,7 @@ const pageTemplate = ({ novels }) => `<!doctype html>
         </div>
         <div class="meta">平台：${escapeHtml(novel.platform || '')} | 评分：${Number.isFinite(novel.rating) ? novel.rating : 0}/10</div>
         <div class="meta">文件：${escapeHtml(novel.file || '')}</div>
+        <div class="desc">简介：${escapeHtml(novel.description || '暂无简介')}</div>
         <div class="actions">
           ${Number.isFinite(Number(novel.id))
             ? `<a href="https://novel.wzfly.top/edit.html?id=${Number(novel.id)}">前往编辑页</a>`
