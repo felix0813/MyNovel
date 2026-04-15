@@ -1,64 +1,144 @@
 import OSS from 'ali-oss';
 
-const pageTemplate = ({ novels }) => `<!doctype html>
+const pageTemplate = ({ novel }) => `<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <title>小说展示</title>
+  <title>${escapeHtml(novel?.name || '小说详情')}</title>
   <style>
-    :root{color-scheme:light only}
-    *{box-sizing:border-box}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:#f4f6f8;margin:0;color:#1f2937}
-    .wrap{max-width:900px;margin:0 auto;padding:36px 16px 48px}
-    .header{margin-bottom:18px}
-    h1{margin:0;font-size:28px;font-weight:700;letter-spacing:.3px}
-    .list{display:grid;gap:10px}
-    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px}
-    .row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-    .name{font-size:17px;font-weight:600}
-    .badge{font-size:12px;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#4338ca}
-    .meta{margin-top:8px;color:#6b7280;font-size:13px}
-    .desc{margin-top:8px;color:#374151;font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
-    .actions{margin-top:10px;display:flex;gap:12px;flex-wrap:wrap}
-    a{color:#2563eb;text-decoration:none}
-    a:hover{text-decoration:underline}
-    .empty{padding:24px;text-align:center;color:#6b7280}
+    :root {
+      --bg: #f6f8fc;
+      --card: #fff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #4f46e5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: linear-gradient(135deg, #4338ca, #6366f1);
+      color: #fff;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .topbar h1 {
+      margin: 0;
+      font-size: 1.6rem;
+    }
+    .topbar .badge {
+      border-radius: 999px;
+      padding: 0.3rem 0.8rem;
+      background: rgba(255, 255, 255, 0.16);
+      font-size: 0.9rem;
+    }
+    .container {
+      max-width: 1080px;
+      margin: 1.5rem auto;
+      padding: 0 1rem;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 1rem;
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.08);
+      margin-bottom: 1rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.9rem;
+    }
+    .item {
+      padding: 0.85rem;
+      border: 1px solid #edf2ff;
+      border-radius: 10px;
+      background: #fafbff;
+      min-height: 88px;
+    }
+    .item h2 {
+      margin: 0 0 0.45rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    .item p {
+      margin: 0;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .item.full { grid-column: 1 / -1; }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 0.25rem;
+    }
+    @media (max-width: 720px) {
+      .topbar { padding: 1rem; }
+      .grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <header class="header">
-      <h1>小说展示</h1>
-    </header>
-    <section class="list">
-    ${novels.length > 0
-    ? novels
-      .map(
-        (novel) => `
-      <div class="card">
-        <div class="row">
-          <div class="name">${escapeHtml(novel.name || '')}</div>
-          <span class="badge">${statusLabel(novel.status)}</span>
-        </div>
-        <div class="meta">平台：${escapeHtml(novel.platform || '')} | 评分：${Number.isFinite(novel.rating) ? novel.rating : 0}/10</div>
-        <div class="meta">文件：${escapeHtml(novel.file || '')}</div>
-        <div class="desc">简介：${escapeHtml(novel.description || '暂无简介')}</div>
+  <header class="topbar">
+    <h1>📚 ${escapeHtml(novel?.name || '小说详情')}</h1>
+    <span class="badge">${statusLabel(novel?.status)}</span>
+  </header>
+
+  <main class="container">
+    <section class="card grid">
+      <article class="item">
+        <h2>平台</h2>
+        <p>${escapeHtml(novel?.platform || '-')}</p>
+      </article>
+      <article class="item">
+        <h2>评分</h2>
+        <p>${normalizeRating(novel?.rating)}/10</p>
+      </article>
+      <article class="item">
+        <h2>文件</h2>
+        <p>${escapeHtml(novel?.file || '-')}</p>
+      </article>
+      <article class="item">
+        <h2>ID</h2>
+        <p>${Number.isFinite(Number(novel?.id)) ? Number(novel?.id) : '-'}</p>
+      </article>
+      <article class="item full">
+        <h2>简介</h2>
+        <p>${escapeHtml(novel?.description || '暂无简介')}</p>
+      </article>
+      <article class="item full">
+        <h2>操作</h2>
         <div class="actions">
-          ${Number.isFinite(Number(novel.id))
-            ? `<a href="https://novel.wzfly.top/edit.html?id=${Number(novel.id)}">前往编辑页</a>`
-            : '<span class="meta">暂无可用 ID</span>'}
-          ${novel.url ? `<a href="${escapeHtml(novel.url)}" target="_blank" rel="noopener noreferrer">阅读链接</a>` : ''}
+          ${Number.isFinite(Number(novel?.id))
+            ? `<a href="https://novel.wzfly.top/edit.html?id=${Number(novel?.id)}">前往编辑页</a>`
+            : '<span>暂无可用 ID</span>'}
+          ${novel?.url ? `<a href="${escapeHtml(novel.url)}" target="_blank" rel="noopener noreferrer">阅读链接</a>` : ''}
         </div>
-      </div>`,
-      )
-      .join('')
-    : '<div class="card empty">暂无小说数据</div>'}
+      </article>
     </section>
   </main>
 </body>
 </html>`;
+
+function normalizeRating (rating) {
+  const n = Number(rating);
+  return Number.isFinite(n) ? n : 0;
+}
 
 function statusLabel (status) {
   if (status === 'unread') return '未读';
@@ -134,17 +214,18 @@ export const handler = async (event) => {
     : JSON.parse(sourceResp.content.toString('utf8'));
   console.log('[handler] source payload loaded');
 
-  const novels = Array.isArray(payload?.novels)
-    ? payload.novels
-    : (payload?.novel ? [payload.novel] : []);
-  novels.sort((a, b) => (Number(b?.rating) || 0) - (Number(a?.rating) || 0));
-  const normalizedNovels = novels.map((novel) => ({
+  const novel = payload?.novel ?? payload;
+  if (!novel || typeof novel !== 'object' || Array.isArray(novel)) {
+    throw new Error('payload must contain one novel object');
+  }
+  const normalizedNovel = {
     ...novel,
     id: Number(novel?.id),
-  }));
-  console.log('[handler] novels normalized', { count: normalizedNovels.length });
+    rating: normalizeRating(novel?.rating),
+  };
+  console.log('[handler] novel normalized', { id: normalizedNovel.id, name: normalizedNovel.name });
 
-  const page = pageTemplate({ novels: normalizedNovels });
+  const page = pageTemplate({ novel: normalizedNovel });
 
   const targetClient = createClient();
   console.log('[handler] uploading generated html');
