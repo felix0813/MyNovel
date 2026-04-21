@@ -165,6 +165,56 @@ function parseEvent (event) {
   return event;
 }
 
+
+async function sendRemoteLog ({ level = 'info', message, extra = {} }) {
+  const baseURL = process.env.LOGGER_SERVER_URL;
+  const appCode = process.env.LOGGER_APP_CODE || 'mynovel-serverless';
+  const env = process.env.APP_ENV || 'dev';
+
+  if (!baseURL || !message) return;
+
+  const payload = {
+    app_code: appCode,
+    env,
+    level,
+    message,
+    extra,
+  };
+
+  try {
+    await fetch(`${baseURL.replace(/\/+$/, '')}/logger/logs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    console.error('[logger] failed to send remote log', { error: error?.message });
+  }
+}
+
+async function registerRemoteApp () {
+  const baseURL = process.env.LOGGER_SERVER_URL;
+  if (!baseURL) return;
+
+  const payload = {
+    app_code: process.env.LOGGER_APP_CODE || 'mynovel-serverless',
+    app_name: process.env.LOGGER_APP_NAME || 'MyNovel Serverless',
+    env: process.env.APP_ENV || 'dev',
+    enabled: true,
+    retention_days: Number(process.env.LOGGER_RETENTION_DAYS || 30),
+    description: process.env.LOGGER_APP_DESC || 'MyNovel OSS trigger',
+  };
+
+  try {
+    await fetch(`${baseURL.replace(/\/+$/, '')}/logger/apps`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    console.error('[logger] failed to register app', { error: error?.message });
+  }
+}
 function createClient () {
   const endpoint = process.env.OSS_ENDPOINT;
   const accessKeyId = process.env.OSS_ACCESS_KEY_ID;
@@ -183,6 +233,8 @@ function createClient () {
 }
 
 export const handler = async (event) => {
+  await registerRemoteApp();
+
   console.log('[handler] received event', {
     eventType: typeof event,
     isBuffer: Buffer.isBuffer(event),
@@ -190,12 +242,14 @@ export const handler = async (event) => {
 
   const parsed = parseEvent(event);
   if (!parsed?.events?.length) {
+    await sendRemoteLog({ level: 'error', message: 'event is empty' });
     throw new Error('event is empty');
   }
 
   const sourceBucket = parsed.events[0]?.oss?.bucket?.name;
   const sourceObjectKey = parsed.events[0]?.oss?.object?.key;
   if (!sourceBucket || !sourceObjectKey) {
+    await sendRemoteLog({ level: 'error', message: 'missing OSS event bucket/object' });
     throw new Error('missing OSS event bucket/object');
   }
   console.log('[handler] parsed OSS trigger', { sourceBucket, sourceObjectKey });
@@ -216,6 +270,7 @@ export const handler = async (event) => {
 
   const novel = payload?.novel ?? payload;
   if (!novel || typeof novel !== 'object' || Array.isArray(novel)) {
+    await sendRemoteLog({ level: 'error', message: 'payload must contain one novel object', extra: { sourceObjectKey } });
     throw new Error('payload must contain one novel object');
   }
   const normalizedNovel = {
@@ -233,6 +288,11 @@ export const handler = async (event) => {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   });
   console.log('[handler] upload completed', { targetKey });
+  await sendRemoteLog({
+    level: 'info',
+    message: 'html generated and uploaded',
+    extra: { targetKey, sourceBucket, sourceObjectKey, novelId: normalizedNovel.id },
+  });
 
   return `generated ${targetKey}`;
 };
