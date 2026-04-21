@@ -182,13 +182,21 @@ async function sendRemoteLog ({ level = 'info', message, extra = {} }) {
   };
 
   try {
-    await fetch(`${baseURL.replace(/\/+$/, '')}/logger/logs`, {
+    const response = await fetch(`${baseURL.replace(/\/+$/, '')}/logger/logs`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
     });
+
+    if (!response.ok) {
+      const responseText = await response.text();
+      throw new Error(`status=${response.status}, body=${responseText}`);
+    }
   } catch (error) {
-    console.error('[logger] failed to send remote log', { error: error?.message });
+    console.error('[logger] failed to send remote log', {
+      error: error?.message,
+      payload,
+    });
   }
 }
 
