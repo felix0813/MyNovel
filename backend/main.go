@@ -235,6 +235,8 @@ func (a *app) handleNovels(w http.ResponseWriter, r *http.Request) {
 func (a *app) handleNovelByID(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r.URL.Path)
 	if err != nil {
+		log.Printf("handle novel by id failed, invalid id path=%q err=%v", r.URL.Path, err)
+		a.logger.ImportantError(r.Context(), "invalid novel id", err, map[string]any{"path": r.URL.Path})
 		writeError(w, http.StatusBadRequest, "invalid novel id")
 		return
 	}
@@ -308,9 +310,11 @@ func (a *app) createNovel(w http.ResponseWriter, r *http.Request) {
 	in, ok := decodeAndValidateNovel(w, r)
 	if !ok {
 		log.Printf("create novel validation failed")
+		a.logger.ImportantError(r.Context(), "create novel validation failed", errors.New("invalid request payload"), nil)
 		return
 	}
 	log.Printf("create novel requested, name=%q platform=%q status=%q rating=%d", in.Name, in.Platform, in.Status, in.Rating)
+	a.logger.ImportantInfo(r.Context(), "create novel started", map[string]any{"name": in.Name, "platform": in.Platform, "status": in.Status})
 	var n Novel
 	err := a.db.QueryRow(r.Context(), `
 		INSERT INTO novels(name, platform, url, file_path, description, status, rating)
@@ -328,10 +332,12 @@ func (a *app) createNovel(w http.ResponseWriter, r *http.Request) {
 	a.logger.ImportantInfo(r.Context(), "novel created", map[string]any{"id": n.ID, "name": n.Name})
 	if err := a.syncNovels(r.Context()); err != nil {
 		log.Printf("create novel sync failed, id=%d err=%v", n.ID, err)
+		a.logger.ImportantError(r.Context(), "create novel sync failed", err, map[string]any{"id": n.ID, "name": n.Name})
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel created but sync failed: %v", err))
 		return
 	}
 	log.Printf("create novel completed, id=%d", n.ID)
+	a.logger.ImportantInfo(r.Context(), "create novel completed", map[string]any{"id": n.ID, "name": n.Name})
 	writeJSON(w, http.StatusCreated, n)
 }
 
@@ -339,9 +345,11 @@ func (a *app) updateNovel(w http.ResponseWriter, r *http.Request, id int64) {
 	in, ok := decodeAndValidateNovel(w, r)
 	if !ok {
 		log.Printf("update novel validation failed, id=%d", id)
+		a.logger.ImportantError(r.Context(), "update novel validation failed", errors.New("invalid request payload"), map[string]any{"id": id})
 		return
 	}
 	log.Printf("update novel requested, id=%d status=%q rating=%d", id, in.Status, in.Rating)
+	a.logger.ImportantInfo(r.Context(), "update novel started", map[string]any{"id": id, "status": in.Status, "rating": in.Rating})
 	var n Novel
 	err := a.db.QueryRow(r.Context(), `
 		UPDATE novels
@@ -365,10 +373,12 @@ func (a *app) updateNovel(w http.ResponseWriter, r *http.Request, id int64) {
 	a.logger.ImportantInfo(r.Context(), "novel updated", map[string]any{"id": id})
 	if err := a.syncNovels(r.Context()); err != nil {
 		log.Printf("update novel sync failed, id=%d err=%v", id, err)
+		a.logger.ImportantError(r.Context(), "update novel sync failed", err, map[string]any{"id": id})
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel updated but sync failed: %v", err))
 		return
 	}
 	log.Printf("update novel completed, id=%d", id)
+	a.logger.ImportantInfo(r.Context(), "update novel completed", map[string]any{"id": id, "name": n.Name})
 	writeJSON(w, http.StatusOK, n)
 }
 
@@ -390,25 +400,30 @@ func (a *app) deleteNovel(w http.ResponseWriter, r *http.Request, id int64) {
 	a.logger.ImportantInfo(r.Context(), "novel deleted", map[string]any{"id": id})
 	if err := a.exporter.deleteNovelHTML(id); err != nil {
 		log.Printf("delete novel html object failed, id=%d err=%v", id, err)
+		a.logger.ImportantError(r.Context(), "delete novel html cleanup failed", err, map[string]any{"id": id})
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel deleted but html cleanup failed: %v", err))
 		return
 	}
 	if err := a.syncNovels(r.Context()); err != nil {
 		log.Printf("delete novel sync failed, id=%d err=%v", id, err)
+		a.logger.ImportantError(r.Context(), "delete novel sync failed", err, map[string]any{"id": id})
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel deleted but sync failed: %v", err))
 		return
 	}
 	log.Printf("delete novel completed, id=%d", id)
+	a.logger.ImportantInfo(r.Context(), "delete novel completed", map[string]any{"id": id})
 	writeJSON(w, http.StatusOK, map[string]string{"message": "deleted"})
 }
 
 func (a *app) syncNovels(ctx context.Context) error {
 	log.Printf("start syncing novels to OSS")
+	a.logger.ImportantInfo(ctx, "sync novels started", nil)
 	rows, err := a.db.Query(ctx, `
 		SELECT id, name, platform, url, file_path, description, status::text, rating, created_at, updated_at
 		FROM novels ORDER BY updated_at DESC`)
 	if err != nil {
 		log.Printf("sync novels query failed err=%v", err)
+		a.logger.ImportantError(ctx, "sync novels query failed", err, nil)
 		return err
 	}
 	defer rows.Close()
@@ -418,15 +433,18 @@ func (a *app) syncNovels(ctx context.Context) error {
 		var n Novel
 		if err := rows.Scan(&n.ID, &n.Name, &n.Platform, &n.URL, &n.File, &n.Description, &n.Status, &n.Rating, &n.CreatedAt, &n.UpdatedAt); err != nil {
 			log.Printf("sync novels scan failed err=%v", err)
+			a.logger.ImportantError(ctx, "sync novels scan failed", err, nil)
 			return err
 		}
 		novels = append(novels, n)
 	}
 	if err := a.exporter.upload(ctx, novels); err != nil {
 		log.Printf("sync novels upload failed, count=%d err=%v", len(novels), err)
+		a.logger.ImportantError(ctx, "sync novels upload failed", err, map[string]any{"count": len(novels)})
 		return err
 	}
 	log.Printf("sync novels completed, count=%d", len(novels))
+	a.logger.ImportantInfo(ctx, "sync novels completed", map[string]any{"count": len(novels)})
 	return nil
 }
 
