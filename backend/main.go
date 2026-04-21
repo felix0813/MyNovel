@@ -76,7 +76,9 @@ func main() {
 		log.Fatalf("init oss exporter failed: %v", err)
 	}
 
+	log.Printf("initializing remote logger service")
 	remoteLogger := logger.NewServiceFromEnv(ctx)
+	log.Printf("remote logger service initialized")
 
 	a := &app{db: db, exporter: exporter, logger: remoteLogger}
 	mux := http.NewServeMux()

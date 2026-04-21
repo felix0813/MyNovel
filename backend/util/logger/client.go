@@ -21,9 +21,18 @@ type Client struct {
 
 // NewFromEnv 从环境变量 LOGGER_SERVER_URL 读取日志服务地址。
 func NewFromEnv() (*Client, error) {
-	baseURL := os.Getenv("LOGGER_SERVER_URL")
+	baseURL := strings.TrimSpace(os.Getenv("LOGGER_SERVER_URL"))
 	if baseURL == "" {
-		return nil, fmt.Errorf("LOGGER_SERVER_URL is required")
+		host := strings.TrimSpace(os.Getenv("LOGGER_SERVER_HOST"))
+		if host != "" {
+			if !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "https://") {
+				host = "http://" + host
+			}
+			baseURL = host
+		}
+	}
+	if baseURL == "" {
+		return nil, fmt.Errorf("LOGGER_SERVER_URL or LOGGER_SERVER_HOST is required")
 	}
 	return New(baseURL), nil
 }

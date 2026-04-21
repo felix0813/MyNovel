@@ -63,8 +63,39 @@ go run .
 | `OSS_JSON_OBJECT` | 否 | `novels/%d.json` | OSS 中 JSON 对象路径模板（按小说 ID 生成）。 |
 | `OSS_HTML_BUCKET` | 否 | `novels-html` | 存放小说 HTML 文件的 OSS Bucket 名称。 |
 | `OSS_HTML_OBJECT` | 否 | `novels/%d.html` | OSS 中 HTML 对象路径模板（按小说 ID 生成）。 |
+| `LOGGER_SERVER_URL` | 否 | 无 | 远程日志服务完整地址（推荐），例如 `http://127.0.0.1:19090`。 |
+| `LOGGER_SERVER_HOST` | 否 | 无 | 远程日志服务 host 地址（可替代 `LOGGER_SERVER_URL`），例如 `127.0.0.1:19090`；未写协议时默认补 `http://`。 |
+| `LOGGER_APP_CODE` | 否 | `mynovel-backend` | 远程日志中的应用编码。 |
+| `LOGGER_APP_NAME` | 否 | `MyNovel Backend` | 远程日志中的应用名称。 |
+| `LOGGER_APP_DESC` | 否 | `MyNovel backend service` | 远程日志中的应用描述。 |
+| `APP_ENV` | 否 | `dev` | 远程日志上报环境。 |
 
 > 说明：如果 `OSS_ENDPOINT` / `OSS_ACCESS_KEY_ID` / `OSS_ACCESS_KEY_SECRET` 任一未配置，后端会自动跳过 OSS 上传，不影响 API 正常使用。
+
+### 远程 Logger 配置说明（可选）
+
+远程日志是**可选能力**：如果 `LOGGER_SERVER_URL` 与 `LOGGER_SERVER_HOST` 都不配置，服务会自动禁用远程日志，仅保留本地标准输出日志，不影响 API 正常使用。
+
+- 推荐方式（完整 URL）：
+
+```bash
+export LOGGER_SERVER_URL="http://127.0.0.1:19090"
+```
+
+- 或者仅配置 host（会自动补全 `http://`）：
+
+```bash
+export LOGGER_SERVER_HOST="127.0.0.1:19090"
+```
+
+可同时搭配：
+
+```bash
+export LOGGER_APP_CODE="mynovel-backend"
+export LOGGER_APP_NAME="MyNovel Backend"
+export LOGGER_APP_DESC="MyNovel backend service"
+export APP_ENV="dev"
+```
 
 ## API 简要说明
 
