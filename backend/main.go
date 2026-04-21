@@ -15,6 +15,7 @@ import (
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"mynovel/backend/util/logger"
 )
 
 type Novel struct {
@@ -43,14 +44,15 @@ type NovelInput struct {
 type app struct {
 	db       *pgxpool.Pool
 	exporter *ossExporter
+	logger   *logger.Service
 }
 
 type ossExporter struct {
-	enabled         bool
-	jsonBucket      *oss.Bucket
-	jsonObjectName  string
-	htmlBucket      *oss.Bucket
-	htmlObjectName  string
+	enabled        bool
+	jsonBucket     *oss.Bucket
+	jsonObjectName string
+	htmlBucket     *oss.Bucket
+	htmlObjectName string
 }
 
 type syncPayload struct {
@@ -74,7 +76,9 @@ func main() {
 		log.Fatalf("init oss exporter failed: %v", err)
 	}
 
-	a := &app{db: db, exporter: exporter}
+	remoteLogger := logger.NewServiceFromEnv(ctx)
+
+	a := &app{db: db, exporter: exporter, logger: remoteLogger}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/myNovel/healthz", a.handleHealth)
 	mux.HandleFunc("/myNovel/api/novels", a.handleNovels)
@@ -82,7 +86,7 @@ func main() {
 
 	addr := env("ADDR", ":8080")
 	log.Printf("backend listening on %s", addr)
-	if err := http.ListenAndServe(addr, withCORS(withLogging(mux))); err != nil {
+	if err := http.ListenAndServe(addr, withCORS(withLogging(mux, remoteLogger))); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -202,9 +206,11 @@ func (a *app) handleHealth(w http.ResponseWriter, r *http.Request) {
 		healthInfo["status"] = "failed"
 		if dbStatus == "failed" {
 			log.Printf("Health check failed: database connection issue")
+			a.logger.ImportantError(r.Context(), "health check database failed", errors.New("database ping failed"), nil)
 		}
 		if ossStatus == "failed" {
 			log.Printf("Health check failed: OSS connection issue")
+			a.logger.ImportantError(r.Context(), "health check oss failed", errors.New("oss check failed"), nil)
 		}
 		writeJSON(w, http.StatusServiceUnavailable, healthInfo)
 		return
@@ -312,10 +318,12 @@ func (a *app) createNovel(w http.ResponseWriter, r *http.Request) {
 	).Scan(&n.ID, &n.Name, &n.Platform, &n.URL, &n.File, &n.Description, &n.Status, &n.Rating, &n.CreatedAt, &n.UpdatedAt)
 	if err != nil {
 		log.Printf("create novel db insert failed, name=%q err=%v", in.Name, err)
+		a.logger.ImportantError(r.Context(), "create novel db insert failed", err, map[string]any{"name": in.Name})
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	log.Printf("create novel succeeded, id=%d", n.ID)
+	a.logger.ImportantInfo(r.Context(), "novel created", map[string]any{"id": n.ID, "name": n.Name})
 	if err := a.syncNovels(r.Context()); err != nil {
 		log.Printf("create novel sync failed, id=%d err=%v", n.ID, err)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel created but sync failed: %v", err))
@@ -347,10 +355,12 @@ func (a *app) updateNovel(w http.ResponseWriter, r *http.Request, id int64) {
 			return
 		}
 		log.Printf("update novel db update failed, id=%d err=%v", id, err)
+		a.logger.ImportantError(r.Context(), "update novel db update failed", err, map[string]any{"id": id})
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	log.Printf("update novel succeeded, id=%d", id)
+	a.logger.ImportantInfo(r.Context(), "novel updated", map[string]any{"id": id})
 	if err := a.syncNovels(r.Context()); err != nil {
 		log.Printf("update novel sync failed, id=%d err=%v", id, err)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel updated but sync failed: %v", err))
@@ -365,6 +375,7 @@ func (a *app) deleteNovel(w http.ResponseWriter, r *http.Request, id int64) {
 	res, err := a.db.Exec(r.Context(), `DELETE FROM novels WHERE id=$1`, id)
 	if err != nil {
 		log.Printf("delete novel db delete failed, id=%d err=%v", id, err)
+		a.logger.ImportantError(r.Context(), "delete novel db delete failed", err, map[string]any{"id": id})
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -374,6 +385,7 @@ func (a *app) deleteNovel(w http.ResponseWriter, r *http.Request, id int64) {
 		return
 	}
 	log.Printf("delete novel succeeded, id=%d", id)
+	a.logger.ImportantInfo(r.Context(), "novel deleted", map[string]any{"id": id})
 	if err := a.exporter.deleteNovelHTML(id); err != nil {
 		log.Printf("delete novel html object failed, id=%d err=%v", id, err)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("novel deleted but html cleanup failed: %v", err))
@@ -478,7 +490,7 @@ func withCORS(next http.Handler) http.Handler {
 	})
 }
 
-func withLogging(next http.Handler) http.Handler {
+func withLogging(next http.Handler, remoteLogger *logger.Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
@@ -493,6 +505,12 @@ func withLogging(next http.Handler) http.Handler {
 			wrapped.statusCode,
 			duration,
 		)
+
+		if wrapped.statusCode >= http.StatusInternalServerError {
+			remoteLogger.SendHTTPLog(r.Context(), "error", "http request failed", r.Method, r.URL.Path, wrapped.statusCode, duration.Milliseconds())
+		} else if wrapped.statusCode >= http.StatusBadRequest {
+			remoteLogger.SendHTTPLog(r.Context(), "warn", "http request warning", r.Method, r.URL.Path, wrapped.statusCode, duration.Milliseconds())
+		}
 	})
 }
 
